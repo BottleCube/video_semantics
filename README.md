@@ -66,6 +66,50 @@ uv run extract.py video.mp4 --language ja -o result.json
 | `--frame-interval` | `15` | キーフレーム抽出間隔（秒） |
 | `--whisper-model` | `large-v3` | Whisperのモデルサイズ |
 | `--language` | 自動検出 | 音声言語コード（例：`ja`, `en`） |
+| `--transcript` | なし | 事前生成した文字起こしJSONのパス（指定時はWhisperをスキップ） |
+
+## サポートツール
+
+### transcribe.py — 文字起こし単体実行
+
+Whisperによる文字起こしのみを行い、タイムスタンプ付きセグメントをJSONとして保存する。
+`extract.py`の文字起こしステップを切り出したツールで、以下のユースケースで役立つ：
+
+- 文字起こし結果を事前に確認・編集してから意味抽出に渡したい場合
+- Whisperの実行時間が長い動画を処理する際に、文字起こしを一度だけ行って使い回したい場合
+
+```bash
+uv run transcribe.py video.mp4 -o transcript.json
+
+# 日本語音声
+uv run transcribe.py video.mp4 --language ja -o transcript.json
+```
+
+#### 出力スキーマ
+
+```json
+[[0.0, "最初のセグメントのテキスト"], [5.2, "次のセグメントのテキスト"]]
+```
+
+各要素は `[開始時刻（秒）, テキスト]` の配列。
+
+#### オプション
+
+| オプション | デフォルト | 説明 |
+|---|---|---|
+| `--output`, `-o` | 必須 | 出力JSONファイルのパス |
+| `--whisper-model` | `large-v3` | Whisperのモデルサイズ |
+| `--language` | 自動検出 | 音声言語コード（例：`ja`, `en`） |
+
+#### transcribe.py と extract.py の連携
+
+```bash
+# 1. 文字起こしを先に実行・保存
+uv run transcribe.py video.mp4 --language ja -o transcript.json
+
+# 2. 文字起こし結果を使って意味抽出（Whisperをスキップ）
+uv run extract.py video.mp4 --transcript transcript.json -o result.json
+```
 
 ## 動作確認環境
 

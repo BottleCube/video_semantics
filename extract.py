@@ -181,8 +181,15 @@ Output valid JSON only."""
         model=model,
         messages=[{"role": "user", "content": prompt}],
         format="json",
+        options={"num_predict": 2048},
     )
     return json.loads(response["message"]["content"])
+
+
+def load_transcript(path: str) -> list[tuple[float, str]]:
+    """文字起こし JSON ファイルを読み込み、(開始時刻, テキスト) のリストを返す。"""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return [(float(t), str(text)) for t, text in data]
 
 
 def process_video(
@@ -192,14 +199,19 @@ def process_video(
     frame_interval: int = FRAME_INTERVAL,
     whisper_model: str = WHISPER_MODEL,
     language: str | None = None,
+    transcript_path: str | None = None,
 ) -> dict:
     """動画ファイルを受け取り、意味抽出結果を dict で返すメインパイプライン。
 
+    transcript_path が指定された場合は Whisper をスキップし、そのファイルを読み込む。
     中間ファイル（音声WAV・フレームJPG）は tempfile.TemporaryDirectory で管理し、
     処理完了後に自動削除される。
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        if has_audio_stream(video_path):
+        if transcript_path is not None:
+            print(f"Loading transcript from {transcript_path} (skipping Whisper)...")
+            transcript = load_transcript(transcript_path)
+        elif has_audio_stream(video_path):
             print("Extracting audio...")
             audio_path = os.path.join(tmpdir, "audio.wav")
             extract_audio(video_path, audio_path)
@@ -233,6 +245,7 @@ def main():
     parser.add_argument("--frame-interval", type=int, default=FRAME_INTERVAL, help=f"Seconds between keyframes (default: {FRAME_INTERVAL})")
     parser.add_argument("--whisper-model", default=WHISPER_MODEL, help=f"Whisper model size (default: {WHISPER_MODEL})")
     parser.add_argument("--language", help="Audio language code e.g. ja, en (default: auto-detect)")
+    parser.add_argument("--transcript", help="Path to pre-computed transcript JSON (skips Whisper)")
     args = parser.parse_args()
 
     result = process_video(
@@ -242,6 +255,7 @@ def main():
         frame_interval=args.frame_interval,
         whisper_model=args.whisper_model,
         language=args.language,
+        transcript_path=args.transcript,
     )
 
     output = json.dumps(result, ensure_ascii=False, indent=2)
